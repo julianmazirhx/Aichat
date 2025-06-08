@@ -23,6 +23,26 @@ export default function ChatPanel({
     if (fileInputRef.current) fileInputRef.current.click();
   };
 
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      // Additional validation in the UI
+      if (!selectedFile.name.toLowerCase().endsWith('.csv')) {
+        alert("❌ Please upload a valid CSV file");
+        e.target.value = ''; // Clear the input
+        return;
+      }
+      setFile(selectedFile);
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-white rounded-xl shadow-sm border border-gray-200">
       {/* Chat Messages */}
@@ -83,7 +103,7 @@ export default function ChatPanel({
             accept=".csv"
             ref={fileInputRef}
             className="hidden"
-            onChange={(e) => setFile(e.target.files?.[0] || null)}
+            onChange={handleFileChange}
           />
           
           <motion.button
@@ -91,6 +111,7 @@ export default function ChatPanel({
             whileTap={{ scale: 0.9 }}
             onClick={triggerFileInput}
             className="p-3 text-gray-500 hover:text-[#246BFD] hover:bg-blue-50 rounded-xl transition-all duration-200"
+            title="Upload CSV file"
           >
             <Paperclip className="w-5 h-5" />
           </motion.button>
@@ -101,6 +122,7 @@ export default function ChatPanel({
               placeholder="Type a message or upload a CSV file..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              onKeyPress={handleKeyPress}
               disabled={loading}
               className="w-full p-4 pr-12 border border-gray-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-[#246BFD] focus:border-transparent transition-all duration-200"
               style={{ minHeight: '56px', maxHeight: '120px' }}
@@ -127,10 +149,11 @@ export default function ChatPanel({
             <div className="flex items-center space-x-2">
               <FileText className="w-4 h-4 text-[#246BFD]" />
               <span className="text-sm text-gray-700">{file.name}</span>
+              <span className="text-xs text-gray-500">({(file.size / 1024).toFixed(1)} KB)</span>
             </div>
             <button
               onClick={() => setFile(null)}
-              className="text-gray-400 hover:text-gray-600"
+              className="text-gray-400 hover:text-gray-600 text-lg font-bold"
             >
               ×
             </button>

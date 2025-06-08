@@ -22,6 +22,29 @@ export default function SuperChatCSVInterface() {
   const [showPreview, setShowPreview] = useState(false);
   const session_id = "123456";
 
+  // Validate CSV file before processing
+  const validateCSVFile = (file) => {
+    // Check if it's a valid File object
+    if (!(file instanceof File)) {
+      alert("❌ Please upload a valid CSV file");
+      return false;
+    }
+
+    // Check if filename ends with .csv
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      alert("❌ Please upload a valid CSV file");
+      return false;
+    }
+
+    // Check if file has content
+    if (file.size === 0) {
+      alert("❌ The uploaded file is empty. Please upload a valid CSV file");
+      return false;
+    }
+
+    return true;
+  };
+
   const sendMessage = async () => {
     if (loading || (!input.trim() && !file)) return;
 
@@ -30,6 +53,13 @@ export default function SuperChatCSVInterface() {
     setInput("");
 
     if (file) {
+      // Validate the file before processing
+      if (!validateCSVFile(file)) {
+        setLoading(false);
+        setFile(null);
+        return;
+      }
+
       const formData = new FormData();
       formData.append("data", file);
       formData.append("session_id", session_id);
@@ -39,6 +69,10 @@ export default function SuperChatCSVInterface() {
           method: "POST",
           body: formData,
         });
+
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
 
         const blob = await res.blob();
         const text = await blob.text();
@@ -50,7 +84,7 @@ export default function SuperChatCSVInterface() {
           ...prev,
           {
             role: "assistant",
-            text: `📄 ${file.name}`,
+            text: `📄 ${file.name} - Successfully processed!`,
             preview: true,
           },
         ]);
