@@ -1,5 +1,5 @@
-import { motion } from 'framer-motion';
-import { X, Download, ChevronLeft } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, Download, ChevronLeft, Maximize2, ArrowLeft } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Papa from 'papaparse';
 
@@ -12,6 +12,7 @@ export default function PreviewPanel({
   const [editableData, setEditableData] = useState([]);
   const [columnWidths, setColumnWidths] = useState({});
   const [panelWidth, setPanelWidth] = useState(50); // percentage
+  const [isFullscreen, setIsFullscreen] = useState(false);
   
   const tableRef = useRef(null);
   const panelRef = useRef(null);
@@ -39,6 +40,13 @@ export default function PreviewPanel({
     }
   }, [csvData]);
 
+  // Reset fullscreen when panel closes
+  useEffect(() => {
+    if (!isOpen) {
+      setIsFullscreen(false);
+    }
+  }, [isOpen]);
+
   // Throttled update function for smoother resizing
   const throttledUpdate = useCallback((updateFn, delay = 16) => {
     let timeoutId;
@@ -57,9 +65,9 @@ export default function PreviewPanel({
     });
   }, []);
 
-  // Column resize handlers
+  // Column resize handlers (only for split-screen mode)
   const handleColumnMouseMove = useCallback(throttledUpdate((e) => {
-    if (!isResizingRef.current || !resizeDataRef.current.columnKey) return;
+    if (!isResizingRef.current || !resizeDataRef.current.columnKey || isFullscreen) return;
     
     e.preventDefault();
     e.stopPropagation();
@@ -71,7 +79,7 @@ export default function PreviewPanel({
       ...prev,
       [resizeDataRef.current.columnKey]: newWidth
     }));
-  }), [throttledUpdate]);
+  }), [throttledUpdate, isFullscreen]);
 
   const handleColumnMouseUp = useCallback(() => {
     if (!isResizingRef.current) return;
@@ -90,6 +98,8 @@ export default function PreviewPanel({
   }, [handleColumnMouseMove]);
 
   const handleResizeStart = useCallback((e, columnKey) => {
+    if (isFullscreen) return; // Disable resizing in fullscreen mode
+    
     e.preventDefault();
     e.stopPropagation();
     
@@ -110,11 +120,11 @@ export default function PreviewPanel({
     // Add global event listeners
     document.addEventListener('mousemove', handleColumnMouseMove, { passive: false });
     document.addEventListener('mouseup', handleColumnMouseUp, { passive: false });
-  }, [columnWidths, handleColumnMouseMove, handleColumnMouseUp]);
+  }, [columnWidths, handleColumnMouseMove, handleColumnMouseUp, isFullscreen]);
 
-  // Panel resize handlers
+  // Panel resize handlers (only for split-screen mode)
   const handlePanelMouseMove = useCallback(throttledUpdate((e) => {
-    if (!panelResizeDataRef.current.isResizing) return;
+    if (!panelResizeDataRef.current.isResizing || isFullscreen) return;
     
     e.preventDefault();
     e.stopPropagation();
@@ -125,7 +135,7 @@ export default function PreviewPanel({
     const newWidth = Math.min(80, Math.max(30, panelResizeDataRef.current.startWidth + deltaPercent));
     
     setPanelWidth(newWidth);
-  }), [throttledUpdate]);
+  }), [throttledUpdate, isFullscreen]);
 
   const handlePanelMouseUp = useCallback(() => {
     if (!panelResizeDataRef.current.isResizing) return;
@@ -143,6 +153,8 @@ export default function PreviewPanel({
   }, [handlePanelMouseMove]);
 
   const handlePanelResizeStart = useCallback((e) => {
+    if (isFullscreen) return; // Disable panel resizing in fullscreen mode
+    
     e.preventDefault();
     e.stopPropagation();
     
@@ -162,7 +174,7 @@ export default function PreviewPanel({
     // Add global event listeners
     document.addEventListener('mousemove', handlePanelMouseMove, { passive: false });
     document.addEventListener('mouseup', handlePanelMouseUp, { passive: false });
-  }, [panelWidth, handlePanelMouseMove, handlePanelMouseUp]);
+  }, [panelWidth, handlePanelMouseMove, handlePanelMouseUp, isFullscreen]);
 
   // Cleanup on unmount or close
   useEffect(() => {
@@ -222,10 +234,145 @@ export default function PreviewPanel({
     }
   }, []);
 
+  // Toggle fullscreen mode
+  const toggleFullscreen = useCallback(() => {
+    setIsFullscreen(!isFullscreen);
+  }, [isFullscreen]);
+
+  // Handle close - if fullscreen, go back to split screen, otherwise close completely
+  const handleClose = useCallback(() => {
+    if (isFullscreen) {
+      setIsFullscreen(false);
+    } else {
+      onClose();
+    }
+  }, [isFullscreen, onClose]);
+
   if (!isOpen || !editableData.length) return null;
 
   const headers = Object.keys(editableData[0]);
 
+  // Fullscreen Mode
+  if (isFullscreen) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.3 }}
+        className="fixed inset-0 bg-white z-50 flex flex-col"
+      >
+        {/* Fullscreen Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-white shadow-sm flex-shrink-0">
+          <div className="flex items-center space-x-4">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setIsFullscreen(false)}
+              className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Back to split screen"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              <span>Back to Split Screen</span>
+            </motion.button>
+            
+            <div className="border-l border-gray-300 pl-4">
+              <h1 className="text-xl font-semibold text-gray-900">CSV Editor - Fullscreen</h1>
+              <p className="text-sm text-gray-500">
+                {fileName} • {editableData.length} rows • {headers.length} columns
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-3">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleDownload}
+              className="flex items-center space-x-2 px-4 py-2 bg-[#246BFD] text-white rounded-lg hover:bg-[#1E5AE8] transition-colors shadow-sm"
+              title="Download edited CSV"
+            >
+              <Download className="w-4 h-4" />
+              <span>Download CSV</span>
+            </motion.button>
+            
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Close editor"
+            >
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
+          </div>
+        </div>
+
+        {/* Fullscreen Table */}
+        <div className="flex-1 overflow-auto bg-gray-50">
+          <div className="min-w-full">
+            <table className="w-full border-collapse bg-white">
+              {/* Header */}
+              <thead className="bg-gray-100 sticky top-0 z-10">
+                <tr>
+                  <th className="w-16 px-4 py-4 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-b-2 border-r border-gray-300 bg-gray-100">
+                    #
+                  </th>
+                  {headers.map((header) => (
+                    <th
+                      key={header}
+                      className="px-4 py-4 text-left text-xs font-medium text-gray-600 uppercase tracking-wider border-b-2 border-r border-gray-300 bg-gray-100 min-w-[150px]"
+                    >
+                      <span className="truncate" title={header}>{header}</span>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+
+              {/* Body */}
+              <tbody className="bg-white">
+                {editableData.map((row, rowIndex) => (
+                  <tr key={rowIndex} className="hover:bg-blue-50 transition-colors">
+                    <td className="px-4 py-3 text-sm text-gray-500 font-mono border-b border-r border-gray-200 bg-gray-50 sticky left-0 z-10">
+                      {rowIndex + 1}
+                    </td>
+                    {headers.map((header) => (
+                      <td
+                        key={`${rowIndex}-${header}`}
+                        className="border-b border-r border-gray-200 p-0 relative group min-w-[150px]"
+                      >
+                        <div
+                          contentEditable
+                          suppressContentEditableWarning={true}
+                          onBlur={(e) => updateCell(rowIndex, header, e.target.textContent)}
+                          onKeyDown={handleCellKeyDown}
+                          className="w-full px-4 py-3 text-sm text-gray-900 bg-transparent border-none focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-200 focus:ring-inset min-h-[44px] cursor-text overflow-hidden"
+                          style={{ 
+                            minHeight: '44px',
+                            wordBreak: 'break-word',
+                            whiteSpace: 'pre-wrap'
+                          }}
+                          title={`Edit ${header} for row ${rowIndex + 1}`}
+                        >
+                          {row[header] || ''}
+                        </div>
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          
+          {editableData.length > 1000 && (
+            <div className="bg-yellow-50 border-t border-yellow-200 px-6 py-4 text-sm text-yellow-800 text-center">
+              ⚠️ Showing first 1,000 rows of {editableData.length} total rows for performance
+            </div>
+          )}
+        </div>
+      </motion.div>
+    );
+  }
+
+  // Split Screen Mode (Original)
   return (
     <>
       {/* Overlay for panel resizing */}
@@ -257,7 +404,7 @@ export default function PreviewPanel({
           <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white sticky top-0 z-20 shadow-sm flex-shrink-0">
             <div className="flex items-center space-x-3 min-w-0">
               <button
-                onClick={onClose}
+                onClick={handleClose}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
                 title="Close preview"
               >
@@ -272,6 +419,17 @@ export default function PreviewPanel({
             </div>
             
             <div className="flex items-center space-x-2 flex-shrink-0">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={toggleFullscreen}
+                className="flex items-center space-x-2 px-3 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Preview fullscreen"
+              >
+                <Maximize2 className="w-4 h-4" />
+                <span className="hidden sm:inline text-sm">Fullscreen</span>
+              </motion.button>
+              
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
