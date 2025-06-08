@@ -47,6 +47,25 @@ export default function PreviewPanel({
     }
   }, [isOpen]);
 
+  // Cleanup function to remove all event listeners and reset state
+  const cleanupResize = useCallback(() => {
+    // Reset resize states
+    isResizingRef.current = false;
+    resizeDataRef.current = {};
+    panelResizeDataRef.current = {};
+    
+    // Remove all event listeners
+    document.removeEventListener('mousemove', handleColumnMouseMove);
+    document.removeEventListener('mouseup', handleColumnMouseUp);
+    document.removeEventListener('mousemove', handlePanelMouseMove);
+    document.removeEventListener('mouseup', handlePanelMouseUp);
+    
+    // Reset body styles
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    document.body.style.pointerEvents = '';
+  }, []);
+
   // Throttled update function for smoother resizing
   const throttledUpdate = useCallback((updateFn, delay = 16) => {
     let timeoutId;
@@ -84,18 +103,8 @@ export default function PreviewPanel({
   const handleColumnMouseUp = useCallback(() => {
     if (!isResizingRef.current) return;
     
-    isResizingRef.current = false;
-    resizeDataRef.current = {};
-    
-    // Clean up event listeners
-    document.removeEventListener('mousemove', handleColumnMouseMove);
-    document.removeEventListener('mouseup', handleColumnMouseUp);
-    
-    // Reset cursor and selection
-    document.body.style.cursor = '';
-    document.body.style.userSelect = '';
-    document.body.style.pointerEvents = '';
-  }, [handleColumnMouseMove]);
+    cleanupResize();
+  }, [cleanupResize]);
 
   const handleResizeStart = useCallback((e, columnKey) => {
     if (isFullscreen) return; // Disable resizing in fullscreen mode
@@ -140,17 +149,8 @@ export default function PreviewPanel({
   const handlePanelMouseUp = useCallback(() => {
     if (!panelResizeDataRef.current.isResizing) return;
     
-    panelResizeDataRef.current = {};
-    
-    // Clean up event listeners
-    document.removeEventListener('mousemove', handlePanelMouseMove);
-    document.removeEventListener('mouseup', handlePanelMouseUp);
-    
-    // Reset cursor and selection
-    document.body.style.cursor = '';
-    document.body.style.userSelect = '';
-    document.body.style.pointerEvents = '';
-  }, [handlePanelMouseMove]);
+    cleanupResize();
+  }, [cleanupResize]);
 
   const handlePanelResizeStart = useCallback((e) => {
     if (isFullscreen) return; // Disable panel resizing in fullscreen mode
@@ -176,25 +176,17 @@ export default function PreviewPanel({
     document.addEventListener('mouseup', handlePanelMouseUp, { passive: false });
   }, [panelWidth, handlePanelMouseMove, handlePanelMouseUp, isFullscreen]);
 
-  // Cleanup on unmount or close
+  // Cleanup on unmount, close, or fullscreen toggle
   useEffect(() => {
-    return () => {
-      // Clean up any active resize operations
-      if (isResizingRef.current) {
-        document.removeEventListener('mousemove', handleColumnMouseMove);
-        document.removeEventListener('mouseup', handleColumnMouseUp);
-      }
-      if (panelResizeDataRef.current.isResizing) {
-        document.removeEventListener('mousemove', handlePanelMouseMove);
-        document.removeEventListener('mouseup', handlePanelMouseUp);
-      }
-      
-      // Reset body styles
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      document.body.style.pointerEvents = '';
-    };
-  }, [handleColumnMouseMove, handleColumnMouseUp, handlePanelMouseMove, handlePanelMouseUp]);
+    return cleanupResize;
+  }, [cleanupResize]);
+
+  // Additional cleanup when switching to fullscreen
+  useEffect(() => {
+    if (isFullscreen) {
+      cleanupResize();
+    }
+  }, [isFullscreen, cleanupResize]);
 
   // Download edited CSV
   const handleDownload = useCallback(() => {
@@ -236,17 +228,20 @@ export default function PreviewPanel({
 
   // Toggle fullscreen mode
   const toggleFullscreen = useCallback(() => {
+    // Clean up any active resize operations before switching modes
+    cleanupResize();
     setIsFullscreen(!isFullscreen);
-  }, [isFullscreen]);
+  }, [isFullscreen, cleanupResize]);
 
   // Handle close - if fullscreen, go back to split screen, otherwise close completely
   const handleClose = useCallback(() => {
+    cleanupResize(); // Clean up before closing
     if (isFullscreen) {
       setIsFullscreen(false);
     } else {
       onClose();
     }
-  }, [isFullscreen, onClose]);
+  }, [isFullscreen, onClose, cleanupResize]);
 
   if (!isOpen || !editableData.length) return null;
 
