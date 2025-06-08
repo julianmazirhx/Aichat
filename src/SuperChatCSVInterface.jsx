@@ -155,10 +155,12 @@ export default function SuperChatCSVInterface() {
             />
           </div>
 
-          {/* Right Panel */}
-          <div className="w-80 p-6 space-y-6">
-            {!showPreview && <QuotePanel />}
-          </div>
+          {/* Right Panel - Only show when preview is hidden */}
+          {!showPreview && (
+            <div className="w-80 p-6 space-y-6">
+              <QuotePanel />
+            </div>
+          )}
         </div>
       </div>
 
