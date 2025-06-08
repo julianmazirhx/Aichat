@@ -1,14 +1,18 @@
 import { useState, useRef, useEffect } from "react";
-import { Input } from "./components/ui/input";
-import { Button } from "./components/ui/button";
-import { Textarea } from "./components/ui/textarea";
-import { motion } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
 import Papa from "papaparse";
-import { UploadCloud } from "lucide-react";
+
+// Components
+import Sidebar from "./components/Sidebar";
+import TopNavbar from "./components/TopNavbar";
+import ChatPanel from "./components/ChatPanel";
+import PreviewPanel from "./components/PreviewPanel";
+import QuotePanel from "./components/QuotePanel";
+import HelpButton from "./components/HelpButton";
 
 export default function SuperChatCSVInterface() {
   const [messages, setMessages] = useState([
-    { role: "assistant", text: "Hi 👋 Upload a CSV or type a cleaning rule." },
+    { role: "assistant", text: "Hi 👋 Welcome to SuperChat AI! Upload a CSV file or type a cleaning rule to get started." },
   ]);
   const [input, setInput] = useState("");
   const [file, setFile] = useState(null);
@@ -16,18 +20,7 @@ export default function SuperChatCSVInterface() {
   const [csvData, setCsvData] = useState([]);
   const [fileName, setFileName] = useState("");
   const [showPreview, setShowPreview] = useState(false);
-  const bottomRef = useRef(null);
-  const fileInputRef = useRef(null);
   const session_id = "123456";
-  const quotes = [
-    "Success is not final, failure is not fatal — it is the courage to continue that counts.",
-    "Dream big. Start small. Act now.",
-    "Discipline is the bridge between goals and accomplishment."
-  ];
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
 
   const sendMessage = async () => {
     if (loading || (!input.trim() && !file)) return;
@@ -57,7 +50,7 @@ export default function SuperChatCSVInterface() {
           ...prev,
           {
             role: "assistant",
-            text: `📄 [${file.name}](#)`,
+            text: `📄 ${file.name}`,
             preview: true,
           },
         ]);
@@ -93,7 +86,7 @@ export default function SuperChatCSVInterface() {
         const response = json.response || json.text || raw;
         setMessages((prev) => [...prev, { role: "assistant", text: response }]);
       } catch (err) {
-        setMessages((prev) => [...prev, { role: "assistant", text: "❌ Server error." }]);
+        setMessages((prev) => [...prev, { role: "assistant", text: "❌ Server error. Please try again." }]);
       } finally {
         setLoading(false);
       }
@@ -102,120 +95,51 @@ export default function SuperChatCSVInterface() {
 
   const handlePreviewClick = () => setShowPreview(true);
 
-  const triggerFileInput = () => {
-    if (fileInputRef.current) fileInputRef.current.click();
-  };
-
   return (
-    <div className="flex flex-col h-screen bg-gray-100">
-      {/* Minimal Icon Navbar */}
-      <header className="bg-white shadow px-6 py-3 flex justify-between items-center">
-        <div className="text-xl font-bold">📁</div>
-        <div className="flex space-x-4 text-gray-600">
-          <div className="w-5 h-5 rounded bg-gray-300" />
-          <div className="w-5 h-5 rounded bg-gray-300" />
-          <div className="w-5 h-5 rounded bg-gray-300" />
-          <div className="w-5 h-5 rounded bg-gray-300" />
-        </div>
-      </header>
+    <div className="h-screen bg-gray-50 flex overflow-hidden">
+      {/* Sidebar */}
+      <Sidebar />
 
-      {/* Main layout */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Chat Area */}
-        <div className="flex flex-col justify-between w-full max-w-3xl mx-auto bg-white shadow rounded overflow-hidden">
-          <div className="p-4 space-y-4 overflow-y-auto flex-1">
-            {messages.map((msg, idx) => (
-              <div
-                key={idx}
-                className={`p-3 rounded-xl max-w-[80%] whitespace-pre-wrap ${
-                  msg.role === "user" ? "bg-blue-100 ml-auto text-right" : "bg-gray-100"
-                }`}
-                onClick={msg.preview ? handlePreviewClick : undefined}
-                style={{ cursor: msg.preview ? "pointer" : "default" }}
-              >
-                {msg.text}
-              </div>
-            ))}
-            {loading && <div className="italic text-sm text-gray-400">Uploading...</div>}
-            <div ref={bottomRef} />
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col">
+        {/* Top Navbar */}
+        <TopNavbar />
+
+        {/* Main Layout */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Chat Area */}
+          <div className="flex-1 p-6">
+            <ChatPanel
+              messages={messages}
+              input={input}
+              setInput={setInput}
+              sendMessage={sendMessage}
+              loading={loading}
+              file={file}
+              setFile={setFile}
+              onPreviewClick={handlePreviewClick}
+            />
           </div>
 
-          {/* Input Bar */}
-          <div className="p-4 border-t bg-white flex space-x-2 items-center">
-            <input
-              type="file"
-              accept=".csv"
-              ref={fileInputRef}
-              className="hidden"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
-            />
-            <button onClick={triggerFileInput} className="p-2 text-gray-600 hover:text-blue-600">
-              <UploadCloud className="w-6 h-6" />
-            </button>
-            <Textarea
-              rows={1}
-              placeholder="Type a rule or message..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              disabled={loading}
-              className="flex-1"
-            />
-            <Button onClick={sendMessage} disabled={loading}>
-              Send
-            </Button>
+          {/* Right Panel */}
+          <div className="w-80 p-6 space-y-6">
+            {!showPreview && <QuotePanel />}
           </div>
         </div>
-
-        {/* Side Panel */}
-        <div className="hidden md:block w-1/3 px-4 pt-10">
-          {!showPreview && (
-            <div className="text-gray-500 italic text-sm">
-              <p>{quotes[Math.floor(Math.random() * quotes.length)]}</p>
-            </div>
-          )}
-        </div>
-
-        {/* Preview Panel */}
-        {showPreview && (
-          <motion.div
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ duration: 0.3 }}
-            className="absolute top-0 right-0 w-full md:w-1/2 h-full bg-white border-l shadow-lg z-10 p-4 overflow-y-auto"
-          >
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">📄 {fileName}</h2>
-              <div className="space-x-2">
-                <Button onClick={() => setShowPreview(false)} variant="outline" className="text-sm">❌ Close</Button>
-                <a href="#" download={fileName} className="text-blue-600 text-sm underline">Download</a>
-              </div>
-            </div>
-            <div className="overflow-auto border rounded">
-              <table className="min-w-full text-sm border-collapse">
-                <thead className="bg-gray-50 sticky top-0">
-                  <tr>
-                    <th className="border px-2 py-1">#</th>
-                    {csvData[0] && Object.keys(csvData[0]).map((key) => (
-                      <th key={key} className="border px-2 py-1 text-left">{key}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {csvData.map((row, idx) => (
-                    <tr key={idx}>
-                      <td className="border px-2 py-1 text-gray-400 text-xs">{idx + 1}</td>
-                      {Object.values(row).map((cell, i) => (
-                        <td key={i} className="border px-2 py-1 whitespace-nowrap">{cell}</td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </motion.div>
-        )}
       </div>
+
+      {/* Preview Panel */}
+      <AnimatePresence>
+        <PreviewPanel
+          isOpen={showPreview}
+          onClose={() => setShowPreview(false)}
+          csvData={csvData}
+          fileName={fileName}
+        />
+      </AnimatePresence>
+
+      {/* Help Button */}
+      <HelpButton />
     </div>
   );
 }
